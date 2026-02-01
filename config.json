@@ -3,8 +3,11 @@
     "query": "Latest news from example.com today",
     "max_results": 20,
     "search_recency_filter": "day",
-    "search_domain_filter": ["example.com"]
+    "search_domain_filter": [
+      "example.com"
+    ]
   },
   "scan_interval_secs": 300,
-  "state_file": "news-state.json"
+  "state_file": "news-state.json",
+  "slack_webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
 }

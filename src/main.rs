@@ -1,9 +1,11 @@
 mod config;
 mod perplexity;
+mod slack;
 mod state;
 
 use config::Config;
 use perplexity::search;
+use slack::post_news;
 use state::State;
 use std::path::Path;
 use std::sync::Arc;
@@ -31,6 +33,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 for item in resp.results {
                     if state.is_new(&item.url) {
                         println!("[NEW] {} | {}", item.title, item.url);
+                        if let Some(ref webhook) = arc_config.slack_webhook_url {
+                            if let Err(e) = post_news(webhook, &item.title, &item.url).await {
+                                eprintln!("Slack error: {}", e);
+                            }
+                        }
                     }
                     state.mark_seen(&item.url);
                 }

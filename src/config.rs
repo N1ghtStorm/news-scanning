@@ -7,6 +7,7 @@ pub struct Config {
     pub scan_interval_secs: u64,
     #[serde(default = "default_state_file")]
     pub state_file: String,
+    pub slack_webhook_url: Option<String>,
 }
 
 fn default_interval() -> u64 {

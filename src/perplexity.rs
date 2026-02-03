@@ -24,10 +24,13 @@ pub struct SearchResult {
     pub title: String,
     pub url: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub snippet: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub date: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub last_updated: String,
 }
 
@@ -50,7 +53,16 @@ pub async fn search(api_key: &str, cfg: &PerplexityConfig) -> Result<SearchRespo
     if !res.status().is_success() {
         let status = res.status();
         let text = res.text().await.unwrap_or_default();
-        return Err(format!("Perplexity API error {}: {}", status, text));
+        let short = text.lines().next().unwrap_or(&text);
+        let msg = if status.as_u16() == 401 {
+            format!(
+                "{} — проверь PERPLEXITY_API_KEY в .env: ключ pplx-... с https://www.perplexity.ai/settings/api",
+                short
+            )
+        } else {
+            format!("Perplexity API error {}: {}", status, short)
+        };
+        return Err(msg);
     }
 
     let out: SearchResponse = res.json().await.map_err(|e| e.to_string())?;

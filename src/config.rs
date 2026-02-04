@@ -9,6 +9,8 @@ pub struct Config {
     #[serde(default = "default_state_file")]
     pub state_file: String,
     pub slack_webhook_url: Option<String>,
+    /// Slack channel ID or name (e.g. #channel) where to send Perplexity results. Overrides SLACK_CHANNEL env if set.
+    pub slack_channel: Option<String>,
     #[serde(default = "default_max_results")]
     pub max_results: u32,
     pub search_recency_filter: Option<String>,
@@ -35,6 +37,8 @@ pub struct SourceEntry {
     /// How many minutes until this query is run again (interval in minutes).
     #[serde(default = "default_time_minutes")]
     pub time: u64,
+    /// Slack channel for this source's results (e.g. #crypto-news). Overrides global slack_channel if set.
+    pub slack_channel: Option<String>,
 }
 
 fn default_time_minutes() -> u64 {

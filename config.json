@@ -3,23 +3,27 @@
     {
       "sites": [],
       "query": "последние новости из мира криптовалют за час. Напиши краткое изложение каждой новости",
-      "time": 1
+      "time": 1,
+      "slack_channel": "#crypto-news"
     },
     {
       "sites": [],
       "query": "последние новости из мира Polkadot за час. Напиши краткое изложение каждой новости",
-      "time": 1
+      "time": 1,
+      "slack_channel": "#test-news"
     },
     {
       "sites": [
         "https://polkadot.polkassembly.io/wish-for-change"
       ],
       "query": "Что скажешь что есть по этой ссылке?",
-      "time": 600
+      "time": 600,
+      "slack_channel": "#polkassembly"
     }
   ],
   "scan_interval_secs": 300,
   "state_file": "news-state.json",
+  "slack_channel": "#perplexity-news",
   "slack_webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
   "max_results": 20,
   "search_recency_filter": "day"

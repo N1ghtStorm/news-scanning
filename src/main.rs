@@ -24,18 +24,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     };
 
-    let slack_bot = std::env::var("SLACK_BOT_TOKEN")
-        .ok()
-        .zip(std::env::var("SLACK_CHANNEL").ok())
-        .map(|(t, c)| {
-            (
-                t,
-                if c.starts_with('#') || c.starts_with('C') {
-                    c
-                } else {
-                    format!("#{}", c)
-                },
-            )
+    let slack_token = std::env::var("SLACK_BOT_TOKEN").ok();
+    let slack_default_channel = config
+        .slack_channel
+        .clone()
+        .or_else(|| std::env::var("SLACK_CHANNEL").ok())
+        .map(|c| {
+            if c.starts_with('#') || c.starts_with('C') {
+                c
+            } else {
+                format!("#{}", c)
+            }
         });
 
     let binding = config.state_file.clone();
@@ -85,8 +84,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else {
                         format!("📋 Query result ({})\n\n{}", sites_label, lines.join("\n"))
                     };
-                    if let Some((ref token, ref ch)) = slack_bot {
-                        if let Err(e) = send_test_message(token, ch, &result_text).await {
+                    let channel = source
+                        .slack_channel
+                        .as_ref()
+                        .or(arc_config.slack_channel.as_ref())
+                        .or(slack_default_channel.as_ref())
+                        .map(|c| {
+                            if c.starts_with('#') || c.starts_with('C') {
+                                c.clone()
+                            } else {
+                                format!("#{}", c)
+                            }
+                        });
+                    if let (Some(ref token), Some(ch)) = (slack_token.as_ref(), channel) {
+                        if let Err(e) = send_test_message(token, &ch, &result_text).await {
                             eprintln!("Slack (result to bot): {}", e);
                         }
                     }
@@ -95,7 +106,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             println!("[NEW] {} | {}", item.title, item.url);
                             if let Some(ref webhook) = arc_config.slack_webhook_url {
                                 if !webhook.contains("YOUR/WEBHOOK") {
-                                    if let Err(e) = post_news(webhook, &item.title, &item.url).await {
+                                    if let Err(e) = post_news(webhook, &item.title, &item.url).await
+                                    {
                                         eprintln!("Slack webhook error: {}", e);
                                     } else {
                                         println!("  -> sent to Slack");

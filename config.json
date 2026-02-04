@@ -1,16 +1,21 @@
 {
   "sources": [
     {
-      "sites": [
-        "https://polkadot.polkassembly.io/wish-for-change?status=Executed&status=Confirmed"
-      ],
-      "query": "Что скажешь что есть по этой ссылке?",
-      "time": 6
+      "sites": [],
+      "query": "последние новости из мира криптовалют за час. Напиши краткое изложение каждой новости",
+      "time": 1
     },
     {
       "sites": [],
-      "query": "Latest Polkadot news for last 2 weeks",
-      "time": 120
+      "query": "последние новости из мира Polkadot за час. Напиши краткое изложение каждой новости",
+      "time": 1
+    },
+    {
+      "sites": [
+        "https://polkadot.polkassembly.io/wish-for-change"
+      ],
+      "query": "Что скажешь что есть по этой ссылке?",
+      "time": 600
     }
   ],
   "scan_interval_secs": 300,

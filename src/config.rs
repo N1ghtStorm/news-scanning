@@ -32,13 +32,13 @@ pub struct SourceEntry {
     pub sites: Vec<String>,
     /// Query to Perplexity for these sites.
     pub query: String,
-    /// How many hours until this query is run again (interval in hours).
-    #[serde(default = "default_time_hours")]
+    /// How many minutes until this query is run again (interval in minutes).
+    #[serde(default = "default_time_minutes")]
     pub time: u64,
 }
 
-fn default_time_hours() -> u64 {
-    1
+fn default_time_minutes() -> u64 {
+    60
 }
 
 fn url_to_domain(site: &str) -> String {

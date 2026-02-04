@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         for (i, source) in arc_config.sources.iter().enumerate() {
             let due = match last_run[i] {
                 None => true,
-                Some(t) => now.saturating_duration_since(t).as_secs() >= source.time * 3600,
+                Some(t) => now.saturating_duration_since(t).as_secs() >= source.time * 60,
             };
             if !due {
                 continue;

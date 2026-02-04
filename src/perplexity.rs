@@ -36,6 +36,78 @@ pub struct SearchResult {
 
 const MAX_RESULTS_CAP: u32 = 100;
 
+#[derive(Debug, Serialize)]
+struct ChatMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ChatCompletionsRequest {
+    model: String,
+    messages: Vec<ChatMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_tokens: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatCompletionsResponse {
+    choices: Vec<ChatChoice>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatChoice {
+    message: ChatMessageResponse,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatMessageResponse {
+    content: Option<String>,
+}
+
+pub async fn completions(api_key: &str, cfg: &PerplexityConfig) -> Result<String, String> {
+    let body = ChatCompletionsRequest {
+        model: "sonar".to_string(),
+        messages: vec![ChatMessage {
+            role: "user".to_string(),
+            content: cfg.query.clone(),
+        }],
+        max_tokens: Some(1024),
+    };
+
+    let res = reqwest::Client::new()
+        .post(format!("{}/chat/completions", API_BASE))
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let text = res.text().await.unwrap_or_default();
+        let short = text.lines().next().unwrap_or(&text);
+        let msg = if status.as_u16() == 401 {
+            format!(
+                "{} — check PERPLEXITY_API_KEY in .env",
+                short
+            )
+        } else {
+            format!("Perplexity API error {}: {}", status, short)
+        };
+        return Err(msg);
+    }
+
+    let out: ChatCompletionsResponse = res.json().await.map_err(|e| e.to_string())?;
+    let text = out
+        .choices
+        .first()
+        .and_then(|c| c.message.content.as_ref())
+        .cloned()
+        .unwrap_or_default();
+    Ok(text)
+}
+
 pub async fn search(api_key: &str, cfg: &PerplexityConfig) -> Result<SearchResponse, String> {
     let max_results = cfg.max_results.min(MAX_RESULTS_CAP).max(1);
     let body = SearchRequest {

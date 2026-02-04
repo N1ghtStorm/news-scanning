@@ -3,8 +3,8 @@ mod perplexity;
 mod slack;
 mod state;
 
-use config::Config;
-use perplexity::search;
+use config::{Config, PerplexityApi};
+use perplexity::{completions, search};
 use slack::{post_news, send_test_message};
 use state::State;
 use std::path::Path;
@@ -62,63 +62,82 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 arc_config.max_results,
                 arc_config.search_recency_filter.as_ref(),
             );
-            match search(&api_key, &cfg).await {
-                Ok(resp) => {
-                    last_run[i] = Some(Instant::now());
-                    if resp.results.is_empty() {
-                        eprintln!(
-                            "Perplexity returned 0 results for query \"{}\" (domains: {}). Try broader query or different search_recency_filter.",
-                            source.query,
-                            source.domains().join(", ")
-                        );
-                    }
-                    let sites_label = source.sites.join(", ");
-                    let lines: Vec<String> = resp
-                        .results
-                        .iter()
-                        .enumerate()
-                        .map(|(j, item)| format!("{}. <{}|{}>", j + 1, item.url, item.title))
-                        .collect();
-                    let result_text = if lines.is_empty() {
-                        format!("📋 Query ({}): no news.", sites_label)
+            let channel = source
+                .slack_channel
+                .as_ref()
+                .or(arc_config.slack_channel.as_ref())
+                .or(slack_default_channel.as_ref())
+                .map(|c| {
+                    if c.starts_with('#') || c.starts_with('C') {
+                        c.clone()
                     } else {
-                        format!("📋 Query result ({})\n\n{}", sites_label, lines.join("\n"))
-                    };
-                    let channel = source
-                        .slack_channel
-                        .as_ref()
-                        .or(arc_config.slack_channel.as_ref())
-                        .or(slack_default_channel.as_ref())
-                        .map(|c| {
-                            if c.starts_with('#') || c.starts_with('C') {
-                                c.clone()
-                            } else {
-                                format!("#{}", c)
-                            }
-                        });
-                    if let (Some(ref token), Some(ch)) = (slack_token.as_ref(), channel) {
-                        if let Err(e) = send_test_message(token, &ch, &result_text).await {
-                            eprintln!("Slack (result to bot): {}", e);
-                        }
+                        format!("#{}", c)
                     }
-                    for item in resp.results {
-                        if state.is_new(&item.url) {
-                            println!("[NEW] {} | {}", item.title, item.url);
-                            if let Some(ref webhook) = arc_config.slack_webhook_url {
-                                if !webhook.contains("YOUR/WEBHOOK") {
-                                    if let Err(e) = post_news(webhook, &item.title, &item.url).await
-                                    {
-                                        eprintln!("Slack webhook error: {}", e);
-                                    } else {
-                                        println!("  -> sent to Slack");
-                                    }
+                });
+
+            match source.api {
+                PerplexityApi::Completions => {
+                    match completions(&api_key, &cfg).await {
+                        Ok(text) => {
+                            last_run[i] = Some(Instant::now());
+                            let result_text = format!("📋 Completions\n\n{}", text);
+                            if let (Some(ref token), Some(ref ch)) = (slack_token.as_ref(), channel) {
+                                if let Err(e) = send_test_message(token, ch, &result_text).await {
+                                    eprintln!("Slack (result to bot): {}", e);
                                 }
                             }
                         }
-                        state.mark_seen(&item.url);
+                        Err(e) => eprintln!("Perplexity completions error ({}): {}", source.sites.join(", "), e),
                     }
                 }
-                Err(e) => eprintln!("Perplexity error ({}): {}", source.sites.join(", "), e),
+                PerplexityApi::Search => {
+                    match search(&api_key, &cfg).await {
+                        Ok(resp) => {
+                            last_run[i] = Some(Instant::now());
+                            if resp.results.is_empty() {
+                                eprintln!(
+                                    "Perplexity returned 0 results for query \"{}\" (domains: {}). Try broader query or different search_recency_filter.",
+                                    source.query,
+                                    source.domains().join(", ")
+                                );
+                            }
+                            let sites_label = source.sites.join(", ");
+                            let lines: Vec<String> = resp
+                                .results
+                                .iter()
+                                .enumerate()
+                                .map(|(j, item)| format!("{}. <{}|{}>", j + 1, item.url, item.title))
+                                .collect();
+                            let result_text = if lines.is_empty() {
+                                format!("📋 Query ({}): no news.", sites_label)
+                            } else {
+                                format!("📋 Query result ({})\n\n{}", sites_label, lines.join("\n"))
+                            };
+                            if let (Some(ref token), Some(ref ch)) = (slack_token.as_ref(), channel) {
+                                if let Err(e) = send_test_message(token, ch, &result_text).await {
+                                    eprintln!("Slack (result to bot): {}", e);
+                                }
+                            }
+                            for item in resp.results {
+                                if state.is_new(&item.url) {
+                                    println!("[NEW] {} | {}", item.title, item.url);
+                                    if let Some(ref webhook) = arc_config.slack_webhook_url {
+                                        if !webhook.contains("YOUR/WEBHOOK") {
+                                            if let Err(e) = post_news(webhook, &item.title, &item.url).await
+                                            {
+                                                eprintln!("Slack webhook error: {}", e);
+                                            } else {
+                                                println!("  -> sent to Slack");
+                                            }
+                                        }
+                                    }
+                                }
+                                state.mark_seen(&item.url);
+                            }
+                        }
+                        Err(e) => eprintln!("Perplexity error ({}): {}", source.sites.join(", "), e),
+                    }
+                }
             }
         }
         if let Err(e) = state.save(state_path) {

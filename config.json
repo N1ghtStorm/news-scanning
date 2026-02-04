@@ -2,15 +2,17 @@
   "sources": [
     {
       "sites": [],
-      "query": "последние новости из мира криптовалют за час. Напиши краткое изложение каждой новости",
+      "query": "Расскажи что-нибудь что произошло в мире криптовалют за час. Сверь год и дату. Напиши краткое изложение каждой новости",
       "time": 1,
-      "slack_channel": "#crypto-news"
+      "slack_channel": "#test-news",
+      "api": "completions"
     },
     {
       "sites": [],
-      "query": "последние новости из мира Polkadot за час. Напиши краткое изложение каждой новости",
+      "query": "Поищи последние новости в мире Polkadot. Сверь год и дату. Напиши краткое изложение каждой новости",
       "time": 1,
-      "slack_channel": "#test-news"
+      "slack_channel": "#test-news",
+      "api": "completions"
     },
     {
       "sites": [
@@ -18,7 +20,8 @@
       ],
       "query": "Что скажешь что есть по этой ссылке?",
       "time": 600,
-      "slack_channel": "#polkassembly"
+      "slack_channel": "#test-news",
+      "api": "completions"
     }
   ],
   "scan_interval_secs": 300,

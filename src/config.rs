@@ -28,6 +28,19 @@ fn default_max_results() -> u32 {
     50
 }
 
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PerplexityApi {
+    Search,
+    Completions,
+}
+
+impl Default for PerplexityApi {
+    fn default() -> Self {
+        PerplexityApi::Search
+    }
+}
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct SourceEntry {
     /// List of domains to search (e.g. ["example.com", "other.com"]).
@@ -39,6 +52,9 @@ pub struct SourceEntry {
     pub time: u64,
     /// Slack channel for this source's results (e.g. #crypto-news). Overrides global slack_channel if set.
     pub slack_channel: Option<String>,
+    /// Which Perplexity API to use: "search" (list of links) or "completions" (text answer).
+    #[serde(default)]
+    pub api: PerplexityApi,
 }
 
 fn default_time_minutes() -> u64 {

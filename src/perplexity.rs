@@ -34,10 +34,13 @@ pub struct SearchResult {
     pub last_updated: String,
 }
 
+const MAX_RESULTS_CAP: u32 = 100;
+
 pub async fn search(api_key: &str, cfg: &PerplexityConfig) -> Result<SearchResponse, String> {
+    let max_results = cfg.max_results.min(MAX_RESULTS_CAP).max(1);
     let body = SearchRequest {
         query: cfg.query.clone(),
-        max_results: Some(cfg.max_results),
+        max_results: Some(max_results),
         search_recency_filter: cfg.search_recency_filter.clone(),
         search_domain_filter: cfg.search_domain_filter.clone(),
     };
@@ -56,7 +59,7 @@ pub async fn search(api_key: &str, cfg: &PerplexityConfig) -> Result<SearchRespo
         let short = text.lines().next().unwrap_or(&text);
         let msg = if status.as_u16() == 401 {
             format!(
-                "{} — проверь PERPLEXITY_API_KEY в .env: ключ pplx-... с https://www.perplexity.ai/settings/api",
+                "{} — check PERPLEXITY_API_KEY in .env: pplx-... key from https://www.perplexity.ai/settings/api",
                 short
             )
         } else {

@@ -1,13 +1,21 @@
 {
-  "perplexity": {
-    "query": "Latest news from example.com today",
-    "max_results": 20,
-    "search_recency_filter": "day",
-    "search_domain_filter": [
-      "example.com"
-    ]
-  },
+  "sources": [
+    {
+      "sites": [
+        "https://polkadot.polkassembly.io/wish-for-change?status=Executed&status=Confirmed"
+      ],
+      "query": "Что скажешь что есть по этой ссылке?",
+      "time": 6
+    },
+    {
+      "sites": [],
+      "query": "Latest Polkadot news for last 2 weeks",
+      "time": 120
+    }
+  ],
   "scan_interval_secs": 300,
   "state_file": "news-state.json",
-  "slack_webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+  "slack_webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+  "max_results": 20,
+  "search_recency_filter": "day"
 }

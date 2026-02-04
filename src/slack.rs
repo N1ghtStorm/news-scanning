@@ -8,7 +8,7 @@ struct ChatPostMessageBody<'a> {
     text: &'a str,
 }
 
-/// Отправка тестового (или любого) сообщения в канал через Bot Token.
+/// Send a message to a channel via Bot Token.
 pub async fn send_test_message(token: &str, channel: &str, text: &str) -> Result<(), String> {
     let body = ChatPostMessageBody { channel, text };
     let res = reqwest::Client::new()
@@ -40,7 +40,7 @@ struct WebhookPayload {
 }
 
 pub async fn post_news(webhook_url: &str, title: &str, url: &str) -> Result<(), String> {
-    let text = format!("📰 *{}*\n<{}|Открыть>", title, url);
+    let text = format!("📰 *{}*\n<{}|Open>", title, url);
 
     let payload = WebhookPayload { text };
 

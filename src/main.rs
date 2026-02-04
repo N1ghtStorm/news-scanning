@@ -9,6 +9,7 @@ use slack::{post_news, send_test_message};
 use state::State;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::time::{interval, Duration};
 
 #[tokio::main]
@@ -18,57 +19,98 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_path = std::env::var("CONFIG").unwrap_or_else(|_| "config.json".to_string());
     let config: Config = serde_json::from_str(&std::fs::read_to_string(&config_path)?)?;
 
-    let slack_channel = std::env::var("SLACK_CHANNEL").unwrap_or_else(|_| "#test-n".to_string());
-    let channel = if slack_channel.starts_with('#') || slack_channel.starts_with('C') {
-        slack_channel.clone()
-    } else {
-        format!("#{}", slack_channel)
-    };
-    if let Ok(token) = std::env::var("SLACK_BOT_TOKEN") {
-        match send_test_message(&token, &channel, "Тестовое сообщение от news-scanning").await
-        {
-            Err(e) => eprintln!("Slack test message error: {}", e),
-            Ok(()) => println!("Test message sent to Slack (channel: {})", channel.as_str()),
-        }
-    } else {
-        println!("SLACK_BOT_TOKEN не задан в .env — тест в Slack пропущен");
-    }
-
     let Ok(api_key) = std::env::var("PERPLEXITY_API_KEY") else {
-        println!("Perplexity отключён (PERPLEXITY_API_KEY не задан). Работа завершена.");
+        println!("Perplexity disabled (PERPLEXITY_API_KEY not set). Exiting.");
         return Ok(());
     };
+
+    let slack_bot = std::env::var("SLACK_BOT_TOKEN")
+        .ok()
+        .zip(std::env::var("SLACK_CHANNEL").ok())
+        .map(|(t, c)| {
+            (
+                t,
+                if c.starts_with('#') || c.starts_with('C') {
+                    c
+                } else {
+                    format!("#{}", c)
+                },
+            )
+        });
 
     let binding = config.state_file.clone();
     let state_path = Path::new(&binding);
     let mut state = State::load(state_path);
 
-    let mut ticker = interval(Duration::from_secs(config.scan_interval_secs));
     let arc_config = Arc::new(config);
+    let check_interval_secs = arc_config.scan_interval_secs.min(60);
+    let mut ticker = interval(Duration::from_secs(check_interval_secs));
+    let mut last_run: Vec<Option<Instant>> = vec![None; arc_config.sources.len()];
 
     ticker.tick().await;
 
     loop {
-        match search(&api_key, &arc_config.perplexity).await {
-            Ok(resp) => {
-                for item in resp.results {
-                    if state.is_new(&item.url) {
-                        println!("[NEW] {} | {}", item.title, item.url);
-                        if let Some(ref webhook) = arc_config.slack_webhook_url {
-                            if let Err(e) = post_news(webhook, &item.title, &item.url).await {
-                                eprintln!("Slack error: {}", e);
-                            } else {
-                                println!("  -> отправлено в Slack");
-                            }
+        let now = Instant::now();
+        for (i, source) in arc_config.sources.iter().enumerate() {
+            let due = match last_run[i] {
+                None => true,
+                Some(t) => now.saturating_duration_since(t).as_secs() >= source.time * 3600,
+            };
+            if !due {
+                continue;
+            }
+            let cfg = source.to_perplexity_config(
+                arc_config.max_results,
+                arc_config.search_recency_filter.as_ref(),
+            );
+            match search(&api_key, &cfg).await {
+                Ok(resp) => {
+                    last_run[i] = Some(Instant::now());
+                    if resp.results.is_empty() {
+                        eprintln!(
+                            "Perplexity returned 0 results for query \"{}\" (domains: {}). Try broader query or different search_recency_filter.",
+                            source.query,
+                            source.domains().join(", ")
+                        );
+                    }
+                    let sites_label = source.sites.join(", ");
+                    let lines: Vec<String> = resp
+                        .results
+                        .iter()
+                        .enumerate()
+                        .map(|(j, item)| format!("{}. <{}|{}>", j + 1, item.url, item.title))
+                        .collect();
+                    let result_text = if lines.is_empty() {
+                        format!("📋 Query ({}): no news.", sites_label)
+                    } else {
+                        format!("📋 Query result ({})\n\n{}", sites_label, lines.join("\n"))
+                    };
+                    if let Some((ref token, ref ch)) = slack_bot {
+                        if let Err(e) = send_test_message(token, ch, &result_text).await {
+                            eprintln!("Slack (result to bot): {}", e);
                         }
                     }
-                    state.mark_seen(&item.url);
+                    for item in resp.results {
+                        if state.is_new(&item.url) {
+                            println!("[NEW] {} | {}", item.title, item.url);
+                            if let Some(ref webhook) = arc_config.slack_webhook_url {
+                                if !webhook.contains("YOUR/WEBHOOK") {
+                                    if let Err(e) = post_news(webhook, &item.title, &item.url).await {
+                                        eprintln!("Slack webhook error: {}", e);
+                                    } else {
+                                        println!("  -> sent to Slack");
+                                    }
+                                }
+                            }
+                        }
+                        state.mark_seen(&item.url);
+                    }
                 }
-                if let Err(e) = state.save(state_path) {
-                    eprintln!("Failed to save state: {}", e);
-                }
+                Err(e) => eprintln!("Perplexity error ({}): {}", source.sites.join(", "), e),
             }
-            Err(e) => eprintln!("Perplexity error: {}", e),
+        }
+        if let Err(e) = state.save(state_path) {
+            eprintln!("Failed to save state: {}", e);
         }
         ticker.tick().await;
     }
